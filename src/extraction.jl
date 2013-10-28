@@ -7,64 +7,136 @@ type Setting
 end
 
 
-function mod_fun(img)
+function mod_fun(V)
     # Return new value `val` for pixel x, y
-    rows, cols = size(img)
-    r = rand(2:rows - 2)
-    c = rand(2:cols - 2)
+    elem = rand(2:(size(V, 1) - 2))
 
     v = 0
-    if img[r, c] == 0
-        v = 1
+    if V[elem] == 0
+        v = 255
     end
 
-    return v, r, c
+    return elem, v
 end
 
 
-function cost_fun(s::Setting, img, r, c)
+function cost_fun(orig, new, v, pos, start)
+    # Compute the local cost of the modification
+    # Orig : the original image
+    # new : the modified image
+    # v : the candidate value for position `pos`
+    # pos : position of the modification
+    # start : hint about the start of the line given to the program
+
+    row, col = start
+    r, c = pos
 
     cost = 0
-    beta = 0.5
+    beta = 0.0
 
     # We want the output image to be like the original
-    cost += abs(img[r, c] - s.img[r, c])
+    cost += abs(v - orig[r, c]) * float(abs(row - r))
 
     # Minimize noise
-    cost += beta * abs(img[r, c] - img[r - 1, c])
-    cost += beta * abs(img[r, c] - img[r - 1, c - 1])
-    cost += beta * abs(img[r, c] - img[r - 1, c + 1])
-    cost += beta * abs(img[r, c] - img[r + 1, c + 1])
-    cost += beta * abs(img[r, c] - img[r + 1, c - 1])
-    cost += beta * abs(img[r, c] - img[r + 1, c])
-    cost += beta * abs(img[r, c] - img[r, c + 1])
-    cost += beta * abs(img[r, c] - img[r, c - 1])
+    #cost += beta * abs(v - img[r - 1, c])
+    cost += beta * abs(v - new[r - 1, c - 1])
+    cost += beta * abs(v - new[r - 1, c + 1])
+    cost += beta * abs(v - new[r + 1, c + 1])
+    cost += beta * abs(v - new[r + 1, c - 1])
+    cost += beta * abs(v - new[r + 1, c])
+    cost += beta * abs(v - new[r, c + 1])
+    cost += beta * abs(v - new[r, c - 1])
 
-    1 - cost
+    cost
 end
 
 
 function extract(file_path, row, col, out_path)
+
     println("extracting line from: $(file_path)")
     println("starting point: (row = $(row), col = $(col))")
 
-    # Read input image
-    img = grayim(imread(file_path))
-    arr = convert(Array, img)
-    arr[arr .== 255] = 1
-    rows, cols = size(arr)
+    # Read input image to sparse matrix
+    orig = sparse(convert(Array, imread(file_path)))
+    rows, cols = size(orig)
 
-    s = Setting(arr, row, col)
-    sa = SA(15.0, 0.999, 1e-5, 1000000)
+    # Candidate
+    obj = copy(orig)
+    I, J, V = findnz(obj)
 
-    function cost(img, r, c)
-        return cost_fun(s, img, row, col)
+
+    # Initial random candidate
+    nbelem = size(V, 1)
+    for i = 1:nbelem
+        V[i] = rand(0:1)
+    end
+    V *= 255
+
+
+    ###########################
+    # Run simulated annealing #
+    ###########################
+
+
+    # Simulated annealing settings
+    t = 10.0
+    t_step = 0.999
+    t_stop = 1e-6
+    max_epoc = 10000000
+    epoc = 0
+
+
+    println("Compute score matrix")
+
+    score = zeros(Float64, nbelem)
+    for i = 2:(nbelem - 1)
+        score[i] = cost_fun(orig, obj, V[i], (I[i], J[i]), (row, col))
     end
 
-    solution = run(sa, rand(0:1, rows, cols), cost, mod_fun)
+    tot_score = sum(score)
+    println("Total score: $(tot_score)")
 
-    # Write result to file
-    solution[solution .== 1] = 255
-    display(convert(Image, solution))
+    println("Run Simulated Annealing")
+
+    while epoc < max_epoc && t > t_stop
+
+        # Choose neighbor
+        elem, v = mod_fun(V)
+        r = I[elem]
+        c = J[elem]
+
+        # Compute local score
+        score_mod = cost_fun(orig, obj, v, (r, c), (row, col))
+
+        # Compute energy delta
+        mod_e = score_mod - score[elem]
+
+        # Keep the candidate or not
+        if mod_e < 0 || rand() <= exp(-mod_e / t)
+            V[elem] = v
+            obj[r, c] = v
+            tot_score = tot_score - score[elem] + score_mod
+            score[elem] = score_mod
+        end
+
+        # Decrease temperature
+        if epoc % 100 == 0
+            t *= t_step
+        end
+
+        epoc += 1
+        # println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
+    end
+
+    println("epocs: $epoc")
+
+
+    ###################
+    # Display results #
+    ###################
+
+
+    # Display result
+    display(convert(Image, dense(obj)))
     # imwrite(convert(Image, solution), out_path)
 end

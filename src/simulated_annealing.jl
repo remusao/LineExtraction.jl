@@ -51,7 +51,7 @@ function run(sa::SA, init, cost_fun, mod_fun)
         end
 
         epoc += 1
-        println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
+        # println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
     end
 
     return obj_mod
