@@ -32,20 +32,20 @@ function cost_fun(orig, new, v, pos, start)
     r, c = pos
 
     cost = 0
-    beta = 0.0
+    beta = 10
 
     # We want the output image to be like the original
-    cost += abs(v - orig[r, c]) * float(abs(row - r))
-
-    # Minimize noise
-    #cost += beta * abs(v - img[r - 1, c])
-    cost += beta * abs(v - new[r - 1, c - 1])
-    cost += beta * abs(v - new[r - 1, c + 1])
-    cost += beta * abs(v - new[r + 1, c + 1])
-    cost += beta * abs(v - new[r + 1, c - 1])
-    cost += beta * abs(v - new[r + 1, c])
-    cost += beta * abs(v - new[r, c + 1])
-    cost += beta * abs(v - new[r, c - 1])
+    cost += beta * abs(v - orig[r, c])
+    cost += v * float(abs(row - r))
+    #cost += v * (-2 * 255
+    #    + new[r - 1, c]
+    #    + new[r - 1, c - 1]
+    #    + new[r - 1, c + 1]
+    #    + new[r + 1, c + 1]
+    #    + new[r + 1, c - 1]
+    #    + new[r + 1, c]
+    #    + new[r, c + 1]
+    #    + new[r, c - 1])
 
     cost
 end
@@ -81,7 +81,7 @@ function extract(file_path, row, col, out_path)
     # Simulated annealing settings
     t = 10.0
     t_step = 0.999
-    t_stop = 1e-6
+    t_stop = 1e-5
     max_epoc = 10000000
     epoc = 0
 
