@@ -158,8 +158,15 @@ function extract(file_path, row, col, out_path)
     # Display results #
     ###################
 
+    orig *= 0
+    orig += 25
+    for i = 1:nbelem
+        if V[i] == 255
+            orig[I[i], J[i]] = 255
+        end
+    end
 
     # Display result
-    display(convert(Image, dense(obj)))
+    display(convert(Image, dense(orig)))
     # imwrite(convert(Image, solution), out_path)
 end
