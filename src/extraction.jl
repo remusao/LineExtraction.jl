@@ -32,11 +32,33 @@ function cost_fun(orig, new, v, pos, start)
     r, c = pos
 
     cost = 0
-    beta = 10
 
-    # We want the output image to be like the original
-    cost += beta * abs(v - orig[r, c])
-    cost += v * float(abs(row - r))
+    # Coeffs
+
+    # Gaussian
+    s = 10.0
+    gauss(mu, sigma, x) = (1 / (sigma * sqrt(2 * pi))) * exp(-(((x - mu) / sigma) * ((x - mu) / sigma)) / 2)
+
+    #println(gauss(row, s, row))
+    #println(gauss(row, s, row + 1))
+    #println(gauss(row, s, row - 1))
+    #println(gauss(row, s, row + 10))
+    #println(gauss(row, s, row - 10))
+    #println(-log(gauss(row, s, row)))
+    #println(-log(gauss(row, s, row + 1)))
+    #println(-log(gauss(row, s, row - 1)))
+    #println(-log(gauss(row, s, row + 10)))
+    #println(-log(gauss(row, s, row - 10)))
+
+    if v == 255
+        cost += -log(gauss(row, s, r) + 1e-5)
+    else
+        cost += -log(1 - gauss(row, s, r) + 1e-5)
+    end
+    #end
+
+    #cost += float(abs(row - r)) * abs(v - orig[r, c])
+    #cost += v * float(abs(row - r))
     #cost += v * (-2 * 255
     #    + new[r - 1, c]
     #    + new[r - 1, c - 1]
@@ -61,9 +83,7 @@ function extract(file_path, row, col, out_path)
     rows, cols = size(orig)
 
     # Candidate
-    obj = copy(orig)
-    I, J, V = findnz(obj)
-
+    I, J, V = findnz(orig)
 
     # Initial random candidate
     nbelem = size(V, 1)
@@ -72,6 +92,8 @@ function extract(file_path, row, col, out_path)
     end
     V *= 255
 
+    obj = sparse(I, J, V)
+
 
     ###########################
     # Run simulated annealing #
@@ -79,7 +101,7 @@ function extract(file_path, row, col, out_path)
 
 
     # Simulated annealing settings
-    t = 10.0
+    t = 5.0
     t_step = 0.999
     t_stop = 1e-5
     max_epoc = 10000000
@@ -128,6 +150,7 @@ function extract(file_path, row, col, out_path)
         # println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
     end
 
+    println("energy: $tot_score")
     println("epocs: $epoc")
 
 
