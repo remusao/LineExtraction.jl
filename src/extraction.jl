@@ -28,46 +28,34 @@ function cost_fun(orig, new, v, pos, start)
     # pos : position of the modification
     # start : hint about the start of the line given to the program
 
+    rows, cols = size(new)
     row, col = start
     r, c = pos
 
     cost = 0
 
-    # Coeffs
+    # if v is:
+    #   black => 255 * change between color
+    #   white => 0
+    cost += (255 - v) * abs(orig[r, c] - v)
 
-    # Gaussian
-    s = 10.0
-    gauss(mu, sigma, x) = (1 / (sigma * sqrt(2 * pi))) * exp(-(((x - mu) / sigma) * ((x - mu) / sigma)) / 2)
+    # if v is:
+    #   black => 0
+    #   white => 20 * distance
+    cost += 20 * v * abs(r - row)
 
-    #println(gauss(row, s, row))
-    #println(gauss(row, s, row + 1))
-    #println(gauss(row, s, row - 1))
-    #println(gauss(row, s, row + 10))
-    #println(gauss(row, s, row - 10))
-    #println(-log(gauss(row, s, row)))
-    #println(-log(gauss(row, s, row + 1)))
-    #println(-log(gauss(row, s, row - 1)))
-    #println(-log(gauss(row, s, row + 10)))
-    #println(-log(gauss(row, s, row - 10)))
-
-    if v == 255
-        cost += -log(gauss(row, s, r) + 1e-5)
-    else
-        cost += -log(1 - gauss(row, s, r) + 1e-5)
+    # Remove noise
+    if (1 < r < rows) && (1 < c < cols)
+        cost += 2 * (
+        + (v - new[r - 1, c])
+        + (v - new[r - 1, c - 1])
+        + (v - new[r - 1, c + 1])
+        + (v - new[r + 1, c + 1])
+        + (v - new[r + 1, c - 1])
+        + (v - new[r + 1, c])
+        + (v - new[r, c + 1])
+        + (v - new[r, c - 1]))
     end
-    #end
-
-    #cost += float(abs(row - r)) * abs(v - orig[r, c])
-    #cost += v * float(abs(row - r))
-    #cost += v * (-2 * 255
-    #    + new[r - 1, c]
-    #    + new[r - 1, c - 1]
-    #    + new[r - 1, c + 1]
-    #    + new[r + 1, c + 1]
-    #    + new[r + 1, c - 1]
-    #    + new[r + 1, c]
-    #    + new[r, c + 1]
-    #    + new[r, c - 1])
 
     cost
 end
@@ -90,10 +78,10 @@ function extract(file_path, row, col, out_path)
     for i = 1:nbelem
         V[i] = rand(0:1)
     end
+
     V *= 255
 
     obj = sparse(I, J, V)
-
 
     ###########################
     # Run simulated annealing #
@@ -158,15 +146,15 @@ function extract(file_path, row, col, out_path)
     # Display results #
     ###################
 
-    orig *= 0
-    orig += 25
-    for i = 1:nbelem
-        if V[i] == 255
-            orig[I[i], J[i]] = 255
-        end
-    end
+    # orig *= 0
+    # orig += 25
+    # for i = 1:nbelem
+    #     if V[i] == 255
+    #        orig[I[i], J[i]] = 255
+    #    end
+    #end
 
     # Display result
-    display(convert(Image, dense(orig)))
+    display(convert(Image, dense(obj)))
     # imwrite(convert(Image, solution), out_path)
 end
