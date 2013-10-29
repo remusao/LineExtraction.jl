@@ -7,20 +7,20 @@ type Setting
 end
 
 
-function mod_fun(V)
-    # Return new value `val` for pixel x, y
-    elem = rand(2:(size(V, 1) - 2))
-
-    v = 0
-    if V[elem] == 0
-        v = 255
+function mod_fun(I, J, arr)
+    j = rand(1:size(arr)[1])        # We randomly choose a column.
+    while arr[j] == -1
+        j = rand(1:size(arr)[1])
     end
+    elts = I[J .== j]               # We get the elements on j-th column.
+    nb_elt_on_col = size(elts)[1]   # We get the number of elements.
+    i = elts[rand(1:nb_elt_on_col)]       # We randomly pick a pixel on this column.
 
-    return elem, v
+    return (i,j)
 end
 
 
-function cost_fun(orig, new, v, pos, start)
+function cost_fun(orig, new, arr, pos, start)
     # Compute the local cost of the modification
     # Orig : the original image
     # new : the modified image
@@ -32,29 +32,11 @@ function cost_fun(orig, new, v, pos, start)
     row, col = start
     r, c = pos
 
+    beta = 1
     cost = 0
-
-    # if v is:
-    #   black => 255 * change between color
-    #   white => 0
-    cost += (255 - v) * abs(orig[r, c] - v)
-
-    # if v is:
-    #   black => 0
-    #   white => 20 * distance
-    cost += 20 * v * abs(r - row)
-
-    # Remove noise
-    if (1 < r < rows) && (1 < c < cols)
-        cost += 2 * (
-        + (v - new[r - 1, c])
-        + (v - new[r - 1, c - 1])
-        + (v - new[r - 1, c + 1])
-        + (v - new[r + 1, c + 1])
-        + (v - new[r + 1, c - 1])
-        + (v - new[r + 1, c])
-        + (v - new[r, c + 1])
-        + (v - new[r, c - 1]))
+    cost += abs(r - row)
+    if (c > 1 && c < cols && arr[c - 1] != arr[c])
+        cost += beta
     end
 
     cost
@@ -72,14 +54,21 @@ function extract(file_path, row, col, out_path)
 
     # Candidate
     I, J, V = findnz(orig)
+    arr = zeros(cols)
 
     # Initial random candidate
     nbelem = size(V, 1)
-    for i = 1:nbelem
-        V[i] = rand(0:1)
+    V *= 0
+    for j = 1:cols
+        elts = I[J .== j]               # We get elements on j-th column.
+        nb_elt_on_col = size(elts)[1]   # We get the number of elements.
+        if (nb_elt_on_col == 0)
+            i = -1
+        else
+            i = elts[rand(1:nb_elt_on_col)]       # We randomly pick a pixel on this column.
+        end
+        arr[j] = i                      # We mark this pixel.
     end
-
-    V *= 255
 
     obj = sparse(I, J, V)
 
@@ -89,18 +78,18 @@ function extract(file_path, row, col, out_path)
 
 
     # Simulated annealing settings
-    t = 5.0
+    t = 25.0
     t_step = 0.999
-    t_stop = 1e-5
-    max_epoc = 10000000
+    t_stop = 1e-4
+    max_epoc = 1#0000000
     epoc = 0
 
 
     println("Compute score matrix")
 
-    score = zeros(Float64, nbelem)
-    for i = 2:(nbelem - 1)
-        score[i] = cost_fun(orig, obj, V[i], (I[i], J[i]), (row, col))
+    score = zeros(Float64, cols)
+    for i = 1:cols
+        score[i] = cost_fun(orig, obj, arr, (arr[i], i), (row, col))
     end
 
     tot_score = sum(score)
@@ -111,31 +100,30 @@ function extract(file_path, row, col, out_path)
     while epoc < max_epoc && t > t_stop
 
         # Choose neighbor
-        elem, v = mod_fun(V)
-        r = I[elem]
-        c = J[elem]
+        r,c = mod_fun(I, J, arr)
 
         # Compute local score
-        score_mod = cost_fun(orig, obj, v, (r, c), (row, col))
+        score_mod = cost_fun(orig, obj, arr, (r, c), (row, col))
 
         # Compute energy delta
-        mod_e = score_mod - score[elem]
+        mod_e = score_mod - score[c]
 
         # Keep the candidate or not
         if mod_e < 0 || rand() <= exp(-mod_e / t)
-            V[elem] = v
-            obj[r, c] = v
-            tot_score = tot_score - score[elem] + score_mod
-            score[elem] = score_mod
+            arr[c] = r
+            tot_score = tot_score - score[c] + score_mod
+            score[c] = score_mod
         end
 
         # Decrease temperature
         if epoc % 100 == 0
             t *= t_step
         end
+        if epoc % 10000 == 0
+            println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
+        end
 
         epoc += 1
-        # println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
     end
 
     println("energy: $tot_score")
@@ -146,15 +134,15 @@ function extract(file_path, row, col, out_path)
     # Display results #
     ###################
 
-    # orig *= 0
-    # orig += 25
-    # for i = 1:nbelem
-    #     if V[i] == 255
-    #        orig[I[i], J[i]] = 255
-    #    end
-    #end
+    orig *= 0.0005
+    for i = 1:cols
+        if (arr[i] != -1)
+            r = int(arr[i])
+            orig[r, i] = 255
+        end
+    end
 
     # Display result
-    display(convert(Image, dense(obj)))
-    # imwrite(convert(Image, solution), out_path)
+    display(convert(Image, dense(orig)))
+    #imwrite(convert(Image, orig), out_path)
 end
