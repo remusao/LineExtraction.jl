@@ -7,16 +7,31 @@ type Setting
 end
 
 
-function mod_fun(row_map, arr, col)
+function mod_fun(row_map, arr, col, scores)
     j = rand(1:size(arr)[1])        # We randomly choose a column.
     while arr[j] == -1 || j == col
         j = rand(1:size(arr)[1])
     end
     elts = row_map[j]               # We get the elements on j-th column.
     nb_elt_on_col = size(elts)[1]   # We get the number of elements.
-    i = elts[rand(1:nb_elt_on_col)]       # We randomly pick a pixel on this column.
+    index = arr[j,2]
+    if scores[j] > 20
+        index = rand(1:nb_elt_on_col)
+        i = elts[index]       # We randomly pick a pixel on this column.
+    else
+        if index == 1 && index == nb_elt_on_col
+            index = index
+        elseif index == 1
+            index += rand(0:1)
+        elseif index == nb_elt_on_col
+            index -= rand(0:1)
+        else
+            index += rand(-1:1)
+        end
+        i = elts[index]
+    end
 
-    return (i,j)
+    return (i,j,index)
 end
 
 
@@ -36,9 +51,9 @@ function cost_fun(orig, new, arr, pos, start)
     beta = 1
 
     cost = 0
-    cost += (abs(r - row) / 20) ^ 5
-    if  c > 1 && arr[c - 1] != arr[c]
-        cost += (1 / (abs(arr[c - 1] - arr[c]))) ^ (1/1)
+    cost += (abs(r - row) / 40) ^ 5
+    if  c > 1 && arr[c - 1, 1] != arr[c, 1]
+        cost += abs(arr[c - 1, 1] - arr[c, 1])
     end
 
     cost
@@ -55,7 +70,7 @@ function extract(file_path, row, col, out_path)
 
     # Candidate
     I, J, V = findnz(orig)
-    arr = zeros(cols)
+    arr = zeros(cols, 2)
     row_map = map((x) -> I[J .== x], 1:cols)
 
     # Initial random candidate
@@ -66,10 +81,12 @@ function extract(file_path, row, col, out_path)
         nb_elt_on_col = size(elts)[1]   # We get the number of elements.
         if (nb_elt_on_col == 0)
             i = -1
+            index = -1
         else
-            i = elts[rand(1:nb_elt_on_col)]       # We randomly pick a pixel on this column.
+            index = rand(1:nb_elt_on_col)
+            i = elts[index]       # We randomly pick a pixel on this column.
         end
-        arr[j] = i                      # We mark this pixel.
+        arr[j,:] = [i, index]                      # We mark this pixel.
     end
 
     obj = sparse(I, J, V)
@@ -82,7 +99,7 @@ function extract(file_path, row, col, out_path)
     # Simulated annealing settings
     t = 25.0
     t_step = 0.9999
-    t_stop = 1e-4
+    t_stop = 1e-6
     max_epoc = 10000000000
     epoc = 0
 
@@ -102,7 +119,7 @@ function extract(file_path, row, col, out_path)
     while epoc < max_epoc && t > t_stop
 
         # Choose neighbor
-        r,c = mod_fun(row_map, arr, col)
+        r,c,index = mod_fun(row_map, arr, col, score)
 
         # Compute local score
         score_mod = cost_fun(orig, obj, arr, (r, c), (row, col))
@@ -112,7 +129,7 @@ function extract(file_path, row, col, out_path)
 
         # Keep the candidate or not
         if mod_e < 0 || rand() <= exp(-mod_e / t)
-            arr[c] = r
+            arr[c,:] = [r, index]
             tot_score = tot_score - score[c] + score_mod
             score[c] = score_mod
         end
