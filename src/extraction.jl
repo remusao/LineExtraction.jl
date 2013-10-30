@@ -7,12 +7,12 @@ type Setting
 end
 
 
-function mod_fun(I, J, arr)
+function mod_fun(row_map, arr, col)
     j = rand(1:size(arr)[1])        # We randomly choose a column.
-    while arr[j] == -1
+    while arr[j] == -1 || j == col
         j = rand(1:size(arr)[1])
     end
-    elts = I[J .== j]               # We get the elements on j-th column.
+    elts = row_map[j]               # We get the elements on j-th column.
     nb_elt_on_col = size(elts)[1]   # We get the number of elements.
     i = elts[rand(1:nb_elt_on_col)]       # We randomly pick a pixel on this column.
 
@@ -32,16 +32,14 @@ function cost_fun(orig, new, arr, pos, start)
     row, col = start
     r, c = pos
 
+    alpha = 2
     beta = 1
+
     cost = 0
-    cost += abs(r - row)
-    if (c > 1 && c < cols && arr[c - 1] != arr[c])
-        cost += beta
-    end
+    cost += alpha * abs(r - row)
 
     cost
 end
-
 
 function extract(file_path, row, col, out_path)
 
@@ -55,12 +53,13 @@ function extract(file_path, row, col, out_path)
     # Candidate
     I, J, V = findnz(orig)
     arr = zeros(cols)
+    row_map = map((x) -> I[J .== x], 1:cols)
 
     # Initial random candidate
     nbelem = size(V, 1)
     V *= 0
     for j = 1:cols
-        elts = I[J .== j]               # We get elements on j-th column.
+        elts = row_map[j]                    # We get elements on j-th column.
         nb_elt_on_col = size(elts)[1]   # We get the number of elements.
         if (nb_elt_on_col == 0)
             i = -1
@@ -81,7 +80,7 @@ function extract(file_path, row, col, out_path)
     t = 25.0
     t_step = 0.999
     t_stop = 1e-4
-    max_epoc = 1#0000000
+    max_epoc = 10000000000
     epoc = 0
 
 
@@ -100,7 +99,7 @@ function extract(file_path, row, col, out_path)
     while epoc < max_epoc && t > t_stop
 
         # Choose neighbor
-        r,c = mod_fun(I, J, arr)
+        r,c = mod_fun(row_map, arr, col)
 
         # Compute local score
         score_mod = cost_fun(orig, obj, arr, (r, c), (row, col))
@@ -119,9 +118,9 @@ function extract(file_path, row, col, out_path)
         if epoc % 100 == 0
             t *= t_step
         end
-        if epoc % 10000 == 0
-            println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
-        end
+        #if epoc % 10000 == 0
+        #    println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
+        #end
 
         epoc += 1
     end
