@@ -1,9 +1,9 @@
 
-
-type Setting
-    img
-    row::Int
-    col::Int
+function safeget(arr, r, c)
+    if r == 0 || c == 0 || r > size(arr, 1) || c > size(arr, 2)
+        return 0
+    end
+    return arr[r, c]
 end
 
 
@@ -20,7 +20,7 @@ function mod_fun(V)
 end
 
 
-function cost_fun(orig, new, v, pos, start)
+function cost_fun(orig, new, pos, start)
     # Compute the local cost of the modification
     # Orig : the original image
     # new : the modified image
@@ -28,20 +28,23 @@ function cost_fun(orig, new, v, pos, start)
     # pos : position of the modification
     # start : hint about the start of the line given to the program
 
-    function safeget(arr, r, c)
-        if r == 0 || c == 0 || r > size(arr, 1) || c > size(arr, 2)
-            return 0
-        end
-        return arr[r, c]
-    end
-
     row, col = start
     r, c = pos
 
     cost = 0
 
-    cost += v * abs(r - row)
-    cost += safeget(new, r - 1, c) + safeget(new, r + 1, c)
+    # Minimize distance between line and white pixels
+    cost += safeget(new, r, c) * abs(r - row)
+    nz = 0
+    for i = -1:1, j = -1:1
+        if safeget(new, r + i, c + j) == 255
+            nz += 1
+        end
+    end
+
+    if nz != 3
+        cost *= 2
+    end
 
     cost
 end
@@ -84,14 +87,16 @@ function extract(file_path, row, col, out_path)
 
     println("Compute score matrix")
 
+    local_score = zeros(Float64, 3, 3)
     score = zeros(Float64, nbelem)
     for i = 2:(nbelem - 1)
-        score[i] = cost_fun(orig, obj, V[i], (I[i], J[i]), (row, col))
+        score[i] = cost_fun(orig, obj, (I[i], J[i]), (row, col))
     end
 
     tot_score = sum(score)
-    println("Total score: $(tot_score)")
+    score = sparse(I, J, score)
 
+    println("Total score: $(tot_score)")
     println("Run Simulated Annealing")
 
     while epoc < max_epoc && t > t_stop
@@ -101,18 +106,34 @@ function extract(file_path, row, col, out_path)
         r = I[elem]
         c = J[elem]
 
+        ######################
+        # Compute delta energy
+        ######################
+
+        old = obj[r, c]
+        obj[r, c] = v
+
+        new_tot = tot_score
+
         # Compute local score
-        score_mod = cost_fun(orig, obj, v, (r, c), (row, col))
+        for i = -1:1, j = -1:1
+            local_score[i + 2, j + 2] = cost_fun(orig, obj, (r + i, c + j), (row, col))
+            new_tot = new_tot - safeget(score, r + i, c + j) + local_score[i + 2, j + 2]
+        end
+
+        obj[r, c] = old
 
         # Compute energy delta
-        mod_e = score_mod - score[elem]
+        mod_e = new_tot - tot_score
 
         # Keep the candidate or not
         if mod_e < 0 || rand() <= exp(-mod_e / t)
             V[elem] = v
             obj[r, c] = v
-            tot_score = tot_score - score[elem] + score_mod
-            score[elem] = score_mod
+            tot_score = new_tot
+            for i = -1:1, j = -1:1
+                score[r + i, c + j] = local_score[i + 2, j + 2]
+            end
         end
 
         # Decrease temperature
