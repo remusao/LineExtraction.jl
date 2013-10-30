@@ -32,11 +32,14 @@ function cost_fun(orig, new, arr, pos, start)
     row, col = start
     r, c = pos
 
-    alpha = 2
+    alpha = 1
     beta = 1
 
     cost = 0
-    cost += alpha * abs(r - row)
+    cost += (abs(r - row) / 20) ^ 5
+    if  c > 1 && arr[c - 1] != arr[c]
+        cost += (1 / (abs(arr[c - 1] - arr[c]))) ^ (1/1)
+    end
 
     cost
 end
@@ -78,7 +81,7 @@ function extract(file_path, row, col, out_path)
 
     # Simulated annealing settings
     t = 25.0
-    t_step = 0.999
+    t_step = 0.9999
     t_stop = 1e-4
     max_epoc = 10000000000
     epoc = 0
@@ -118,9 +121,9 @@ function extract(file_path, row, col, out_path)
         if epoc % 100 == 0
             t *= t_step
         end
-        #if epoc % 10000 == 0
-        #    println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
-        #end
+        if epoc % 10000 == 0
+            println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
+        end
 
         epoc += 1
     end
