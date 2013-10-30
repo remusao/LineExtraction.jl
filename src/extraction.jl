@@ -28,34 +28,20 @@ function cost_fun(orig, new, v, pos, start)
     # pos : position of the modification
     # start : hint about the start of the line given to the program
 
-    rows, cols = size(new)
+    function safeget(arr, r, c)
+        if r == 0 || c == 0 || r > size(arr, 1) || c > size(arr, 2)
+            return 0
+        end
+        return arr[r, c]
+    end
+
     row, col = start
     r, c = pos
 
     cost = 0
 
-    # if v is:
-    #   black => 255 * change between color
-    #   white => 0
-    cost += (255 - v) * abs(orig[r, c] - v)
-
-    # if v is:
-    #   black => 0
-    #   white => 20 * distance
-    cost += 20 * v * abs(r - row)
-
-    # Remove noise
-    if (1 < r < rows) && (1 < c < cols)
-        cost += 2 * (
-        + (v - new[r - 1, c])
-        + (v - new[r - 1, c - 1])
-        + (v - new[r - 1, c + 1])
-        + (v - new[r + 1, c + 1])
-        + (v - new[r + 1, c - 1])
-        + (v - new[r + 1, c])
-        + (v - new[r, c + 1])
-        + (v - new[r, c - 1]))
-    end
+    cost += v * abs(r - row)
+    cost += safeget(new, r - 1, c) + safeget(new, r + 1, c)
 
     cost
 end
@@ -90,9 +76,9 @@ function extract(file_path, row, col, out_path)
 
     # Simulated annealing settings
     t = 5.0
-    t_step = 0.999
-    t_stop = 1e-5
-    max_epoc = 10000000
+    t_step = 0.9999
+    t_stop = 1e-7
+    max_epoc = 100000000
     epoc = 0
 
 
@@ -134,8 +120,11 @@ function extract(file_path, row, col, out_path)
             t *= t_step
         end
 
+        if epoc % 10000 == 0
+            println("epoc: $(epoc); cost: $(tot_score), temp: $(t)")
+        end
+
         epoc += 1
-        # println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
     end
 
     println("energy: $tot_score")
