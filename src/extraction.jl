@@ -14,22 +14,8 @@ function mod_fun(row_map, arr, col, scores)
     end
     elts = row_map[j]               # We get the elements on j-th column.
     nb_elt_on_col = size(elts)[1]   # We get the number of elements.
-    index = arr[j,2]
-    if scores[j] > 20
-        index = rand(1:nb_elt_on_col)
-        i = elts[index]       # We randomly pick a pixel on this column.
-    else
-        if index == 1 && index == nb_elt_on_col
-            index = index
-        elseif index == 1
-            index += rand(0:1)
-        elseif index == nb_elt_on_col
-            index -= rand(0:1)
-        else
-            index += rand(-1:1)
-        end
-        i = elts[index]
-    end
+    index = rand(1:nb_elt_on_col)
+    i = elts[index]
 
     return (i,j,index)
 end
@@ -48,12 +34,18 @@ function cost_fun(orig, new, arr, pos, start)
     r, c = pos
 
     alpha = 1
-    beta = 1
+    #beta = 12
+    beta = 28
 
     cost = 0
-    cost += (abs(r - row) / 40) ^ 5
-    if  c > 1 && arr[c - 1, 1] != arr[c, 1]
-        cost += abs(arr[c - 1, 1] - arr[c, 1])
+    #cost += (abs(r - row) / 40) ^ 5
+    #if  c > 1 && arr[c - 1, 1] != arr[c, 1]
+    #    cost += abs(arr[c - 1, 1] - arr[c, 1])
+    #end
+    if c > 1 && arr[c - 1, 1] == -1
+        cost += alpha * abs(r - row)
+    elseif c > 1
+        cost += beta * abs(r - arr[c - 1, 1]) * (1 + abs(r - row)) ^ (1/2)
     end
 
     cost
@@ -97,9 +89,9 @@ function extract(file_path, row, col, out_path)
 
 
     # Simulated annealing settings
-    t = 25.0
-    t_step = 0.9999
-    t_stop = 1e-6
+    t = 2500.0
+    t_step = 0.999999
+    t_stop = 50
     max_epoc = 10000000000
     epoc = 0
 
@@ -138,13 +130,14 @@ function extract(file_path, row, col, out_path)
         if epoc % 100 == 0
             t *= t_step
         end
-        if epoc % 10000 == 0
+        if epoc % 1000000 == 0
             println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
         end
 
         epoc += 1
     end
 
+    println("temperature: $t")
     println("energy: $tot_score")
     println("epocs: $epoc")
 
