@@ -9,12 +9,17 @@ end
 
 function mod_fun(row_map, arr, col, scores)
     j = rand(1:size(arr)[1])        # We randomly choose a column.
-    while arr[j] == -1 || j == col
+    while arr[j, 1] == -1 || j == col
         j = rand(1:size(arr)[1])
     end
     elts = row_map[j]               # We get the elements on j-th column.
     nb_elt_on_col = size(elts)[1]   # We get the number of elements.
-    index = rand(1:nb_elt_on_col)
+    start_index = arr[j, 3]
+    rnd = randn()
+    index = int(rnd * (10) + start_index)
+    index = max(index, 1)
+    index = min(index, nb_elt_on_col)
+    #index = rand(1:nb_elt_on_col)
     i = elts[index]
 
     return (i,j,index)
@@ -35,7 +40,7 @@ function cost_fun(orig, new, arr, pos, start)
 
     alpha = 1
     #beta = 12
-    beta = 28
+    beta = 40
 
     cost = 0
     #cost += (abs(r - row) / 40) ^ 5
@@ -44,8 +49,12 @@ function cost_fun(orig, new, arr, pos, start)
     #end
     if c > 1 && arr[c - 1, 1] == -1
         cost += alpha * abs(r - row)
-    elseif c > 1
-        cost += beta * abs(r - arr[c - 1, 1]) * (1 + abs(r - row)) ^ (1/2)
+    end
+    if c > 1 && arr[c - 1, 1] != -1
+        cost += beta * abs(r - arr[c - 1, 1]) * (abs(r - row) + 1) ^ (1/2)
+    end
+    if c < size(arr,1) && arr[c + 1, 1] != -1
+        cost += beta * abs(r - arr[c + 1, 1]) * (abs(r - row) + 1) ^ (1/2)
     end
 
     cost
@@ -57,12 +66,14 @@ function extract(file_path, row, col, out_path)
     println("starting point: (row = $(row), col = $(col))")
 
     # Read input image to sparse matrix
-    orig = sparse(convert(Array, imread(file_path)))
+    img = convert(Array, float64(imread(file_path)))
+    img[row, col] = 255
+    orig = sparse(img)
     rows, cols = size(orig)
 
     # Candidate
     I, J, V = findnz(orig)
-    arr = zeros(cols, 2)
+    arr = zeros(cols, 3)
     row_map = map((x) -> I[J .== x], 1:cols)
 
     # Initial random candidate
@@ -71,14 +82,21 @@ function extract(file_path, row, col, out_path)
     for j = 1:cols
         elts = row_map[j]                    # We get elements on j-th column.
         nb_elt_on_col = size(elts)[1]   # We get the number of elements.
+        start_index = 0
         if (nb_elt_on_col == 0)
             i = -1
             index = -1
         else
-            index = rand(1:nb_elt_on_col)
+            start_index = max(size(row_map[j][row_map[j] .<= row], 1), 1)
+            #rnd = randn()
+            #index = int(rnd * (10) + start_index)
+            #index = max(index, 1)
+            #index = min(index, nb_elt_on_col)
+            #println("start_index: $(start_index + 0), nb_elt: $nb_elt_on_col rnd: $rnd, index: $index")
+            index = start_index
             i = elts[index]       # We randomly pick a pixel on this column.
         end
-        arr[j,:] = [i, index]                      # We mark this pixel.
+        arr[j,:] = [i, index, start_index]                      # We mark this pixel.
     end
 
     obj = sparse(I, J, V)
@@ -90,8 +108,8 @@ function extract(file_path, row, col, out_path)
 
     # Simulated annealing settings
     t = 2500.0
-    t_step = 0.999999
-    t_stop = 50
+    t_step = 0.99999
+    t_stop = 1
     max_epoc = 10000000000
     epoc = 0
 
@@ -121,7 +139,7 @@ function extract(file_path, row, col, out_path)
 
         # Keep the candidate or not
         if mod_e < 0 || rand() <= exp(-mod_e / t)
-            arr[c,:] = [r, index]
+            arr[c,:] = [r, index, arr[c,3]]
             tot_score = tot_score - score[c] + score_mod
             score[c] = score_mod
         end
@@ -146,15 +164,16 @@ function extract(file_path, row, col, out_path)
     # Display results #
     ###################
 
-    orig *= 0.0005
+    img *= 0.0005
     for i = 1:cols
         if (arr[i] != -1)
             r = int(arr[i])
-            orig[r, i] = 255
+            img[r, i] = 255
         end
     end
 
     # Display result
-    display(convert(Image, dense(orig)))
-    #imwrite(convert(Image, orig), out_path)
+    img2 = convert(Image, img)
+    display(img2)
+    #imwrite(img2, out_path)
 end
