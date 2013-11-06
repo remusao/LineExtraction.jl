@@ -21,7 +21,6 @@ function mod_fun(row_map, arr, col, scores)
     index = max(index, 1)
     index = min(index, nb_elt_on_col)
 
-    #index = rand(1:nb_elt_on_col)
     i = elts[index]
 
     return (i,j,index)
@@ -97,7 +96,6 @@ function extract(file_path, row, col, out_path)
             index = max(index, 1)
             index = min(index, nb_elt_on_col)
 
-            #index = start_index
             i = elts[index]
         end
         arr[j,:] = [i, index, start_index]    # We mark this pixel.
@@ -155,7 +153,7 @@ function extract(file_path, row, col, out_path)
             t *= t_step
         end
         if epoc % 1000000 == 0
-            println("Iteration number: $(epoc); e: $(mod_e); cost: $(tot_score), temp: $(t)")
+            println("Iteration number: $(epoc); cost: $(tot_score), temp: $(t)")
         end
 
         epoc += 1
@@ -181,5 +179,5 @@ function extract(file_path, row, col, out_path)
     # Display result
     img2 = convert(Image, img)
     display(img2)
-    imwrite(img2, out_path)
+    #imwrite(img2, out_path)
 end
